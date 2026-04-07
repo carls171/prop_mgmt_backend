@@ -468,29 +468,33 @@ def create_property(
     }
 
 
-@app.delete("/income/{income_id}")
-def delete_income(
+@app.delete("/properties/{property_id}/income/{income_id}")
+def delete_income_for_property(
+    property_id: int,
     income_id: int,
     bq: bigquery.Client = Depends(get_bq_client)
 ):
     """
-    Deletes an income record by ID.
+    Deletes a specific income record for a specific property.
     """
 
     query = f"""
         DELETE FROM `{PROJECT_ID}.{DATASET}.income`
-        WHERE income_id = @income_id
+        WHERE income_id = @income_id 
+          AND property_id = @property_id
     """
 
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("income_id", "INT64", income_id)
+            bigquery.ScalarQueryParameter("income_id", "INT64", income_id),
+            bigquery.ScalarQueryParameter("property_id", "INT64", property_id)
         ]
     )
 
     try:
-        result = bq.query(query, job_config=job_config)
-        result.result()
+        job = bq.query(query, job_config=job_config)
+        job.result() 
+        
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -498,6 +502,7 @@ def delete_income(
         )
 
     return {
-        "message": "Income record deleted successfully.",
-        "income_id": income_id
+        "message": "Income record deletion processed.",
+        "income_id": income_id,
+        "property_id": property_id
     }
