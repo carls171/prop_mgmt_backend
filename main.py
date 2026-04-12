@@ -237,6 +237,9 @@ def get_expenses_byid(property_id: int, bq: bigquery.Client = Depends(get_bq_cli
     return expense
 
 
+# -----------------------------
+# Request Model
+# -----------------------------
 class ExpenseCreate(BaseModel):
     amount: float
     date: date
@@ -245,6 +248,9 @@ class ExpenseCreate(BaseModel):
     description: str
 
 
+# -----------------------------
+# Create Expense Endpoint
+# -----------------------------
 @app.post("/expenses/{property_id}")
 def create_expense_record(
     property_id: int,
@@ -253,16 +259,19 @@ def create_expense_record(
 ):
     query = f"""
         INSERT INTO `{PROJECT_ID}.{DATASET}.expenses`
-            (property_id, amount, date, category, vendor, description)
+        (property_id, amount, date, category, vendor, description)
         VALUES
-            (@property_id, @amount, @date, @category, @vendor, @description)
+        (@property_id, @amount, @date, @category, @vendor, @description)
     """
 
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
             bigquery.ScalarQueryParameter("property_id", "INT64", property_id),
             bigquery.ScalarQueryParameter("amount", "FLOAT64", expense.amount),
-            bigquery.ScalarQueryParameter("date", "DATE", expense.date.isoformat()),
+            
+            # ✅ FIXED: pass date directly (NOT isoformat)
+            bigquery.ScalarQueryParameter("date", "DATE", expense.date),
+            
             bigquery.ScalarQueryParameter("category", "STRING", expense.category),
             bigquery.ScalarQueryParameter("vendor", "STRING", expense.vendor),
             bigquery.ScalarQueryParameter("description", "STRING", expense.description),
@@ -270,8 +279,15 @@ def create_expense_record(
     )
 
     try:
-        bq.query(query, job_config=job_config).result()
+        job = bq.query(query, job_config=job_config)
+        job.result()  # Wait for completion
+
     except Exception as e:
+        # ✅ MUCH better debugging
+        print("=== BIGQUERY ERROR ===")
+        print(str(e))
+        print("======================")
+
         raise HTTPException(
             status_code=500,
             detail=f"Database query failed: {str(e)}"
