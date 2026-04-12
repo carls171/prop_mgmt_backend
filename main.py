@@ -253,56 +253,49 @@ class ExpenseCreate(BaseModel):
 # -----------------------------
 # Create Expense Endpoint
 # -----------------------------
-@app.post("/expenses/{property_id}")
-def create_expense_record(
+@app.post("/expenses/{property_id}", status_code=201)
+def create_expense(
     property_id: int,
     expense: ExpenseCreate,
     bq: bigquery.Client = Depends(get_bq_client)
 ):
-    query = f"""
-        INSERT INTO `{PROJECT_ID}.{DATASET}.expenses`
-        (property_id, amount, date, category, vendor, description)
-        VALUES
-        (@property_id, @amount, @date, @category, @vendor, @description)
-    """
-
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("property_id", "INT64", property_id),
-            bigquery.ScalarQueryParameter("amount", "FLOAT64", expense.amount),
-            
-            # ✅ FIXED: pass date directly (NOT isoformat)
-            bigquery.ScalarQueryParameter("date", "DATE", expense.date),
-            
-            bigquery.ScalarQueryParameter("category", "STRING", expense.category),
-            bigquery.ScalarQueryParameter("vendor", "STRING", expense.vendor),
-            bigquery.ScalarQueryParameter("description", "STRING", expense.description),
-        ]
-    )
+    rows_to_insert = [
+        {
+            "property_id": property_id,
+            "amount": expense.amount,
+            "date": str(expense.date),  # YYYY-MM-DD
+            "category": expense.category,
+            "vendor": expense.vendor,
+            "description": expense.description
+        }
+    ]
 
     try:
-        job = bq.query(query, job_config=job_config)
-        job.result()  # Wait for completion
+        errors = bq.insert_rows_json(
+            f"{PROJECT_ID}.{DATASET}.expenses",
+            rows_to_insert
+        )
+
+        if errors:
+            print("BIGQUERY INSERT ERRORS:", errors)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insert failed: {errors}"
+            )
 
     except Exception as e:
-        # ✅ MUCH better debugging
-        print("=== BIGQUERY ERROR ===")
+        print("=== EXPENSE ERROR ===")
         print(str(e))
-        print("======================")
+        print("=====================")
 
         raise HTTPException(
             status_code=500,
-            detail=f"Database query failed: {str(e)}"
+            detail=str(e)
         )
 
     return {
-        "message": "Expense record created successfully.",
-        "property_id": property_id,
-        "amount": expense.amount,
-        "date": expense.date,
-        "category": expense.category,
-        "vendor": expense.vendor,
-        "description": expense.description
+        "message": "Expense record created successfully",
+        "property_id": property_id
     }
 
 # ---------------------------------------------------------------------------
