@@ -3,6 +3,7 @@ from google.cloud import bigquery
 from pydantic import BaseModel
 from datetime import date
 from typing import Optional
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
@@ -160,6 +161,7 @@ def create_income_record(
     property_id: int,
     income: IncomeCreate,
     bq: bigquery.Client = Depends(get_bq_client)
+    
 ):
     query = f"""
         INSERT INTO `{PROJECT_ID}.{DATASET}.income`
@@ -172,7 +174,7 @@ def create_income_record(
         query_parameters=[
             bigquery.ScalarQueryParameter("property_id", "INT64", property_id),
             bigquery.ScalarQueryParameter("amount", "FLOAT64", income.amount),
-            bigquery.ScalarQueryParameter("date", "DATE", income.date.isoformat()),
+            bigquery.ScalarQueryParameter("date", "DATE", income.date),
             bigquery.ScalarQueryParameter("description", "STRING", income.description),
         ]
     )
