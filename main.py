@@ -164,11 +164,11 @@ def create_income_record(
     
 ):
     query = f"""
-        INSERT INTO `{PROJECT_ID}.{DATASET}.income`
-            (property_id, amount, date, description)
-        VALUES
-            (@property_id, @amount, @date, @description)
-    """
+    INSERT INTO `{PROJECT_ID}.{DATASET}.income`
+        (income_id, property_id, amount, date, description)
+    VALUES
+        (GENERATE_UUID(), @property_id, @amount, @date, @description)
+"""
 
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
