@@ -264,42 +264,38 @@ def create_expense(
     expense: ExpenseCreate,
     bq: bigquery.Client = Depends(get_bq_client)
 ):
+
+    # get next expense_id
+    query = f"""
+        SELECT IFNULL(MAX(expense_id), 0) + 1 AS next_id
+        FROM `{PROJECT_ID}.{DATASET}.expenses`
+    """
+
+    next_id = list(bq.query(query).result())[0]["next_id"]
+
     rows_to_insert = [
         {
+            "expense_id": next_id,
             "property_id": property_id,
             "amount": expense.amount,
-            "date": str(expense.date),  # YYYY-MM-DD
+            "date": str(expense.date),
             "category": expense.category,
             "vendor": expense.vendor,
             "description": expense.description
         }
     ]
 
-    try:
-        errors = bq.insert_rows_json(
-            f"{PROJECT_ID}.{DATASET}.expenses",
-            rows_to_insert
-        )
+    errors = bq.insert_rows_json(
+        f"{PROJECT_ID}.{DATASET}.expenses",
+        rows_to_insert
+    )
 
-        if errors:
-            print("BIGQUERY INSERT ERRORS:", errors)
-            raise HTTPException(
-                status_code=400,
-                detail=f"Insert failed: {errors}"
-            )
-
-    except Exception as e:
-        print("=== EXPENSE ERROR ===")
-        print(str(e))
-        print("=====================")
-
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+    if errors:
+        raise HTTPException(status_code=400, detail=str(errors))
 
     return {
         "message": "Expense record created successfully",
+        "expense_id": next_id,
         "property_id": property_id
     }
 
